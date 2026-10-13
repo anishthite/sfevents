@@ -42,17 +42,35 @@ async function getCandidates(env: Env) {
   const token = await getAccessToken(env);
   const userId = userIdFromJwt(token);
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json", Origin: "https://partiful.com", Referer: "https://partiful.com/" };
-  const post = async (endpoint: string) => {
-    const response = await fetch(`https://api.partiful.com/${endpoint}`, { method: "POST", headers, body: JSON.stringify({ data: { params: {}, userId } }) });
+  const post = async (endpoint: string, params: Record<string, unknown> = {}) => {
+    const response = await fetch(`https://api.partiful.com/${endpoint}`, { method: "POST", headers, body: JSON.stringify({ data: { params, userId } }) });
     if (!response.ok) throw new Error(`Partiful API error: ${response.status} on /${endpoint}`);
     const body = await response.json() as { result?: { data?: unknown } };
     return body.result?.data;
   };
-  const [discoverable, rsvps, saved, followed] = await Promise.all([
-    post("getDiscoverableEvents"), post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
+  const publicDiscoverable = fetch("https://partiful.com/explore/l/sf/this-week")
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`Partiful Explore returned ${response.status}`);
+      const ids = [...new Set([...((await response.text()).matchAll(/partiful\.com\/e\/([A-Za-z0-9]+)/g))].map((match) => match[1]))].slice(0, 24);
+      const results = await Promise.all(ids.map(async (eventId) => {
+        try {
+          const page = await fetch(`https://partiful.com/e/${eventId}`);
+          const html = await page.text();
+          const match = html.match(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
+          if (!match) return null;
+          const data = JSON.parse(match[1]) as { name?: string; startDate?: string; endDate?: string; image?: string; location?: { name?: string } };
+          return data.name ? { id: eventId, title: data.name, startDate: data.startDate, endDate: data.endDate, locationDisplayText: data.location?.name, image: data.image ? { url: data.image } : undefined } : null;
+        } catch { return null; }
+      }));
+      return results.filter((event): event is NonNullable<typeof event> => event !== null);
+    })
+    .catch(() => []);
+  const [discoverable, publicEvents, rsvps, saved, followed] = await Promise.all([
+    post("getDiscoverableEvents"), publicDiscoverable, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
   ]);
   const events = (value: unknown) => Array.isArray(value) ? value : (value as { events?: unknown[] } | null)?.events ?? [];
-  return { discoverable: events(discoverable), rsvps: events(rsvps), saved: events(saved), followed: events(followed) }; 
+  const byId = new Map([...events(discoverable), ...publicEvents].filter((event) => event && typeof event === "object" && "id" in event).map((event) => [(event as { id: string }).id, event]));
+  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed) }; 
 }
 
 export default {
