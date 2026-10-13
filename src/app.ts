@@ -40,15 +40,15 @@ async function recordFailure(env: Env, error: unknown) {
   await env.DB.prepare("INSERT INTO sync_runs (source, status, error, finished_at) VALUES (?, ?, ?, ?)").bind("partiful", "failed", message, new Date().toISOString()).run();
 }
 
-function rankForMeetingPeople(event: EventCard): RankedEvent {
+function rankForDating(event: EventCard): RankedEvent {
   const raw = JSON.parse(event.raw ?? "{}") as { description?: string };
   const text = `${event.title} ${raw.description ?? ""}`.toLowerCase();
   const reasons: string[] = [];
   let score = 0;
-  if (/women|woman|girls|female|femme|lesbian|queer women/.test(text)) { score += 30; reasons.push("women-centered"); }
-  if (/make (a )?friend|meet new people|meet people|mixer|social|community|networking|hang out|meetup/.test(text)) { score += 20; reasons.push("built to meet people"); }
+  if (/singles|speed dat|dating|matchmak|date night|flirt|romance/.test(text)) { score += 35; reasons.push("dating-focused"); }
+  if (/mixer|social|meet new people|meet people|community|networking|hang out|meetup/.test(text)) { score += 18; reasons.push("social by design"); }
   if (/come alone|solo|new to (the )?(bay|sf|city)|welcoming/.test(text)) { score += 12; reasons.push("solo-friendly"); }
-  if (/walk|picnic|craft|workshop|game|dance|class|club/.test(text)) { score += 8; reasons.push("easy conversation activity"); }
+  if (/walk|picnic|craft|workshop|game|dance|class|club/.test(text)) { score += 8; reasons.push("easy way to talk"); }
   if (event.location?.toLowerCase().includes("san francisco")) { score += 5; reasons.push("in SF"); }
   if (event.start_at && event.start_at !== "TBD" && [0, 5, 6].includes(new Date(event.start_at).getDay())) { score += 4; reasons.push("weekend"); }
   return { ...event, score, reasons: reasons.slice(0, 3) };
@@ -61,13 +61,13 @@ function eventCard(event: EventCard | RankedEvent, featured = false) {
 }
 
 function page(discoveries: EventCard[], events: EventCard[], syncedAt: string | null) {
-  const ranked = discoveries.map(rankForMeetingPeople).sort((a, b) => b.score - a.score);
+  const ranked = discoveries.map(rankForDating).sort((a, b) => b.score - a.score);
   const discoveryCards = ranked.map((event) => eventCard(event, true)).join("") || "<p class=empty>No new discoveries since the last day.</p>";
   const upcomingCards = events.map((event) => eventCard(event)).join("") || "<p class=empty>No upcoming events yet.</p>";
   const syncLabel = syncedAt ? `Last refreshed ${escapeHtml(new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(syncedAt)))}` : "Waiting for first sync";
   return `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>sfevents</title><style>
     :root{color:#191811;background:#f6f5ef;font-family:ui-rounded,"SF Pro Rounded",ui-sans-serif,system-ui,sans-serif}*{box-sizing:border-box}body{margin:0}.shell{max-width:1120px;margin:auto;padding:48px 24px 80px}.top{display:flex;justify-content:space-between;align-items:end;gap:24px;border-bottom:1px solid #d8d5c8;padding-bottom:28px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#777367;margin:0 0 8px}h1{font:500 clamp(42px,7vw,72px)/.94 Georgia,serif;letter-spacing:-.065em;margin:0}h2{font:500 28px/1 Georgia,serif;letter-spacing:-.04em;margin:0}.sync{font-size:13px;color:#777367;white-space:nowrap;margin:0}.section{margin-top:44px}.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px}.count{font-size:13px;color:#777367}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.event{background:#fff;border:1px solid #e0ded5;border-radius:14px;color:inherit;display:flex;min-height:168px;overflow:hidden;text-decoration:none;transition:transform 160ms cubic-bezier(.23,1,.32,1),box-shadow 160ms ease}.event:active{transform:scale(.98)}.date-mark{align-items:center;background:#e8e6db;color:#777367;display:flex;font:500 14px/1 Georgia,serif;justify-content:center;min-width:82px;padding:12px;text-align:center}.event-body{display:flex;flex:1;flex-direction:column;gap:8px;padding:16px}.event-title{font-size:16px;font-weight:650;line-height:1.2}.event-meta{font-size:13px;line-height:1.35;color:#68655c}.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}.badges span{background:#f0efe8;border-radius:999px;color:#625f55;font-size:11px;padding:4px 7px}.featured{background:#193a2d;color:#f6f5ef;border-color:#193a2d}.featured .event-meta{color:#c8d2c9}.featured .badges span{background:#315342;color:#e6ece4}.empty{color:#777367;font-size:14px;margin:0}@media (hover:hover) and (pointer:fine){.event:hover{box-shadow:0 12px 28px #22221a16;transform:translateY(-2px)}}@media(max-width:760px){.shell{padding:30px 16px 56px}.top{align-items:start;flex-direction:column}.grid{grid-template-columns:1fr}.event{min-height:0}.date-mark{min-width:86px}.event-body{padding:14px}}
-  </style><body><main class="shell"><header class="top"><div><p class="eyebrow">San Francisco, from Partiful</p><h1>Things to do.</h1></div><p class="sync">${syncLabel}</p></header><section class="section"><div class="section-head"><h2>Best for meeting people</h2><span class="count">${discoveries.length} new discoveries · ranked for you</span></div><div class="grid">${discoveryCards}</div></section><section class="section"><div class="section-head"><h2>Upcoming</h2><span class="count">${events.length} events</span></div><div class="grid">${upcomingCards}</div></section></main></body></html>`;
+  </style><body><main class="shell"><header class="top"><div><p class="eyebrow">San Francisco, from Partiful</p><h1>Things to do.</h1></div><p class="sync">${syncLabel}</p></header><section class="section"><div class="section-head"><h2>Best bets for a date</h2><span class="count">${discoveries.length} new discoveries · dating-ranked</span></div><div class="grid">${discoveryCards}</div></section><section class="section"><div class="section-head"><h2>Upcoming</h2><span class="count">${events.length} events</span></div><div class="grid">${upcomingCards}</div></section></main></body></html>`;
 }
 
 function escapeHtml(value: string) {
