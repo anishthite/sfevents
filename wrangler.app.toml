@@ -1,0 +1,16 @@
+name = "sfevents"
+account_id = "38136d7e8e51d4450fd5687cdba2ce2a"
+main = "src/app.ts"
+compatibility_date = "2026-10-10"
+
+[triggers]
+crons = ["0 16 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sfevents"
+database_id = "858ad9af-4b65-4c70-a034-d97c7fc1bfa4"
+
+[[services]]
+binding = "PARTIFUL_MCP"
+service = "sfevents-partiful"

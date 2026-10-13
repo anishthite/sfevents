@@ -1,0 +1,4 @@
+name = "sfevents-partiful"
+account_id = "38136d7e8e51d4450fd5687cdba2ce2a"
+main = "src/connector.ts"
+compatibility_date = "2026-10-10"
