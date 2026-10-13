@@ -76,7 +76,7 @@ export default {
       const latestSync = env.DB.prepare("SELECT finished_at FROM sync_runs WHERE status = 'success' ORDER BY id DESC LIMIT 1");
       const [eventResults, discoveryResults, syncResult] = await env.DB.batch([upcoming, discoveries, latestSync]);
       const syncedAt = (syncResult.results[0] as { finished_at?: string } | undefined)?.finished_at ?? null;
-      return new Response(page(discoveryResults.results as EventCard[], eventResults.results as EventCard[], syncedAt), { headers: { "Content-Type": "text/html; charset=utf-8" } });
+      return new Response(page(discoveryResults.results as EventCard[], eventResults.results as EventCard[], syncedAt), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
     }
     return new Response("Not found", { status: 404 });
   },
