@@ -58,8 +58,8 @@ async function getCandidates(env: Env) {
           const html = await page.text();
           const match = html.match(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
           if (!match) return null;
-          const data = JSON.parse(match[1]) as { name?: string; startDate?: string; endDate?: string; image?: string; location?: { name?: string } };
-          return data.name ? { id: eventId, title: data.name, startDate: data.startDate, endDate: data.endDate, locationDisplayText: data.location?.name, image: data.image ? { url: data.image } : undefined } : null;
+          const data = JSON.parse(match[1]) as { name?: string; description?: string; startDate?: string; endDate?: string; image?: string; location?: { name?: string } };
+          return data.name ? { id: eventId, title: data.name, description: data.description, startDate: data.startDate, endDate: data.endDate, locationDisplayText: data.location?.name, image: data.image ? { url: data.image } : undefined } : null;
         } catch { return null; }
       }));
       return results.filter((event): event is NonNullable<typeof event> => event !== null);
