@@ -6,6 +6,29 @@ interface Env {
 
 type RpcRequest = { id?: string | number | null; method?: string; params?: Record<string, unknown> };
 
+function text(value: string) {
+  return value.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, "\"").trim();
+}
+
+function startAt(date: string, time: string) {
+  const match = time.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  if (!match) return `${date.replaceAll("/", "-")}T00:00:00-07:00`;
+  let hour = Number(match[1]) % 12;
+  if (match[3].toLowerCase() === "pm") hour += 12;
+  return `${date.replaceAll("/", "-")}T${String(hour).padStart(2, "0")}:${match[2] ?? "00"}:00-07:00`;
+}
+
+function parse19hz(html: string) {
+  const events = [] as Array<Record<string, unknown>>;
+  for (const match of html.matchAll(/<tr><td>([\s\S]*?)<\/td><td><a href='([^']+)'>([\s\S]*?)<\/a> @([\s\S]*?)<td>[\s\S]*?<div class='shrink'>(\d{4}\/\d{2}\/\d{2})<\/div>/g)) {
+    const time = text(match[1]).match(/\(([^)]+)\)/)?.[1] ?? "";
+    const title = text(match[3]);
+    if (!title) continue;
+    events.push({ id: `${match[5]}|${match[2]}`, title, startDate: startAt(match[5], time), locationDisplayText: text(match[4]), url: match[2] });
+  }
+  return events.filter((event) => String(event.startDate) >= new Date().toISOString()).slice(0, 400);
+}
+
 const tools = [{
   name: "get_event_candidates",
   description: "Get Partiful events to consider: discoverable, RSVPed, saved, and followed.",
@@ -98,12 +121,13 @@ async function getCandidates(env: Env) {
       return events.filter((event): event is NonNullable<typeof event> => event !== null);
     })
     .catch(() => []);
-  const [discoverable, publicEvents, lumaEvents, rsvps, saved, followed] = await Promise.all([
-    post("getDiscoverableEvents"), publicDiscoverable, lumaDiscoverable, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
+  const nineteenHz = fetch("https://19hz.info/eventlisting_BayArea.php").then((response) => response.ok ? response.text() : "").then(parse19hz).catch(() => []);
+  const [discoverable, publicEvents, lumaEvents, nineteenHzEvents, rsvps, saved, followed] = await Promise.all([
+    post("getDiscoverableEvents"), publicDiscoverable, lumaDiscoverable, nineteenHz, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
   ]);
   const events = (value: unknown) => Array.isArray(value) ? value : (value as { events?: unknown[] } | null)?.events ?? [];
   const byId = new Map([...events(discoverable), ...publicEvents].filter((event) => event && typeof event === "object" && "id" in event).map((event) => [(event as { id: string }).id, event]));
-  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed), luma: lumaEvents }; 
+  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed), luma: lumaEvents, "19hz": nineteenHzEvents }; 
 }
 
 export default {
