@@ -48,10 +48,17 @@ async function getCandidates(env: Env) {
     const body = await response.json() as { result?: { data?: unknown } };
     return body.result?.data;
   };
-  const publicDiscoverable = fetch("https://partiful.com/explore/l/sf/this-week")
-    .then(async (response) => {
-      if (!response.ok) throw new Error(`Partiful Explore returned ${response.status}`);
-      const ids = [...new Set([...((await response.text()).matchAll(/partiful\.com\/e\/([A-Za-z0-9]+)/g))].map((match) => match[1]))].slice(0, 24);
+  const publicDiscoverable = Promise.all([
+    "https://partiful.com/explore/l/sf/this-week",
+    "https://partiful.com/explore/l/sf/parties",
+    "https://partiful.com/explore/l/sf/free-events",
+  ].map(async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Partiful Explore returned ${response.status}`);
+    return response.text();
+  }))
+    .then(async (pages) => {
+      const ids = [...new Set(pages.flatMap((page) => [...page.matchAll(/partiful\.com\/e\/([A-Za-z0-9]+)/g)].map((match) => match[1])))].slice(0, 48);
       const results = await Promise.all(ids.map(async (eventId) => {
         try {
           const page = await fetch(`https://partiful.com/e/${eventId}`);
@@ -65,12 +72,38 @@ async function getCandidates(env: Env) {
       return results.filter((event): event is NonNullable<typeof event> => event !== null);
     })
     .catch(() => []);
-  const [discoverable, publicEvents, rsvps, saved, followed] = await Promise.all([
-    post("getDiscoverableEvents"), publicDiscoverable, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
+  const lumaHeaders = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36", Accept: "text/html,application/xhtml+xml" };
+  const lumaDiscoverable = Promise.all([
+    "https://luma.com/sf",
+    "https://luma.com/thefoldsf",
+    "https://luma.com/SFSocialClubHouse",
+    "https://luma.com/startupsocial",
+  ].map(async (url) => {
+    const response = await fetch(url, { headers: lumaHeaders });
+    if (!response.ok) throw new Error(`Luma returned ${response.status}`);
+    return response.text();
+  }))
+    .then(async (pages) => {
+      const slugs = [...new Set(pages.flatMap((page) => [...page.matchAll(/<a[^>]*class="event-link[^>]*href="\/([^"?#]+)/g)].map((match) => match[1])))].slice(0, 60);
+      const events = await Promise.all(slugs.map(async (slug) => {
+        try {
+          const response = await fetch(`https://luma.com/${slug}`, { headers: lumaHeaders });
+          const html = await response.text();
+          const match = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
+          if (!match) return null;
+          const data = JSON.parse(match[1]) as { name?: string; description?: string; startDate?: string; endDate?: string; image?: string; location?: { name?: string } };
+          return data.name ? { id: slug, title: data.name, description: data.description, startDate: data.startDate, endDate: data.endDate, locationDisplayText: data.location?.name, image: data.image ? { url: data.image } : undefined } : null;
+        } catch { return null; }
+      }));
+      return events.filter((event): event is NonNullable<typeof event> => event !== null);
+    })
+    .catch(() => []);
+  const [discoverable, publicEvents, lumaEvents, rsvps, saved, followed] = await Promise.all([
+    post("getDiscoverableEvents"), publicDiscoverable, lumaDiscoverable, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
   ]);
   const events = (value: unknown) => Array.isArray(value) ? value : (value as { events?: unknown[] } | null)?.events ?? [];
   const byId = new Map([...events(discoverable), ...publicEvents].filter((event) => event && typeof event === "object" && "id" in event).map((event) => [(event as { id: string }).id, event]));
-  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed) }; 
+  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed), luma: lumaEvents }; 
 }
 
 export default {

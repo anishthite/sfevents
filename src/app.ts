@@ -8,7 +8,7 @@ interface Env {
 }
 
 type CandidateGroups = Record<string, unknown[]>;
-type EventCard = { source_id: string; title: string; start_at: string | null; location: string | null; image_url: string | null; rsvp_status: string | null; sources: string; raw?: string };
+type EventCard = { source: string; source_id: string; title: string; start_at: string | null; location: string | null; image_url: string | null; rsvp_status: string | null; sources: string; raw?: string }; 
 type RankedEvent = EventCard & { score: number; reasons: string[] }; 
 
 async function sync(env: Env) {
@@ -29,7 +29,7 @@ async function sync(env: Env) {
       title = excluded.title, start_at = excluded.start_at, end_at = excluded.end_at, timezone = excluded.timezone,
       location = excluded.location, image_url = excluded.image_url, rsvp_status = excluded.rsvp_status,
       sources = excluded.sources, raw = excluded.raw, updated_at = excluded.updated_at
-  `).bind("partiful", event.sourceId, event.title, event.startAt, event.endAt, event.timezone, event.location, event.imageUrl, event.rsvpStatus, JSON.stringify(event.sources), JSON.stringify(event.raw), now, now));
+  `).bind(event.source, event.sourceId, event.title, event.startAt, event.endAt, event.timezone, event.location, event.imageUrl, event.rsvpStatus, JSON.stringify(event.sources), JSON.stringify(event.raw), now, now));
   if (statements.length) await env.DB.batch(statements);
   await env.DB.prepare("INSERT INTO sync_runs (source, status, event_count, finished_at) VALUES (?, ?, ?, ?)").bind("partiful", "success", statements.length, now).run();
   return statements.length;
@@ -57,7 +57,7 @@ function rankForDating(event: EventCard): RankedEvent {
 function eventCard(event: EventCard | RankedEvent, featured = false, rank?: number) {
   const date = event.start_at && event.start_at !== "TBD" ? new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(event.start_at)) : "Time TBD";
   const sources = JSON.parse(event.sources) as string[];
-  return `<a class="event${featured ? " featured" : ""}" href="https://partiful.com/e/${encodeURIComponent(event.source_id)}" target="_blank" rel="noreferrer">${rank ? `<span class="rank">#${rank}<small>date pick</small></span>` : ""}<span class="date-mark">${escapeHtml(date.split(",")[0] ?? "TBD")}</span><span class="event-body"><span class="event-title">${escapeHtml(event.title)}</span>${"score" in event ? `<span class="score">Dating fit · ${event.score} points</span>` : ""}<span class="event-meta">${escapeHtml(date)}${event.location ? ` · ${escapeHtml(event.location)}` : ""}</span><span class="badges">${"reasons" in event ? event.reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join("") : `<span>${sources.includes("discoverable") ? "Discovered" : escapeHtml(sources.join(" · "))}</span>`}${event.rsvp_status ? `<span>${escapeHtml(event.rsvp_status.toLowerCase())}</span>` : ""}</span></span></a>`;
+  return `<a class="event${featured ? " featured" : ""}" href="${event.source === "luma" ? "https://luma.com/" : "https://partiful.com/e/"}${encodeURIComponent(event.source_id)}" target="_blank" rel="noreferrer">${rank ? `<span class="rank">#${rank}<small>date pick</small></span>` : ""}<span class="date-mark">${escapeHtml(date.split(",")[0] ?? "TBD")}</span><span class="event-body"><span class="event-title">${escapeHtml(event.title)}</span>${"score" in event ? `<span class="score">Dating fit · ${event.score} points</span>` : ""}<span class="event-meta">${escapeHtml(date)}${event.location ? ` · ${escapeHtml(event.location)}` : ""}</span><span class="badges">${"reasons" in event ? event.reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join("") : `<span>${sources.includes("discoverable") ? "Discovered" : escapeHtml(sources.join(" · "))}</span>`}${event.rsvp_status ? `<span>${escapeHtml(event.rsvp_status.toLowerCase())}</span>` : ""}</span></span></a>`;
 }
 
 function page(discoveries: EventCard[], events: EventCard[], syncedAt: string | null) {
@@ -87,8 +87,8 @@ export default {
     }
     if (url.pathname === "/") {
       const now = new Date();
-      const upcoming = env.DB.prepare("SELECT source_id, title, start_at, location, image_url, rsvp_status, sources, raw FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 100").bind(now.toISOString());
-      const discoveries = env.DB.prepare("SELECT source_id, title, start_at, location, image_url, rsvp_status, sources, raw FROM events WHERE first_seen_at >= ? AND sources LIKE '%\"discoverable\"%' AND (start_at IS NULL OR start_at >= ?) ORDER BY start_at LIMIT 12").bind(new Date(now.getTime() - 86_400_000).toISOString(), now.toISOString());
+      const upcoming = env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, raw FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 100").bind(now.toISOString());
+      const discoveries = env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, raw FROM events WHERE first_seen_at >= ? AND (sources LIKE '%\"discoverable\"%' OR source = 'luma') AND (start_at IS NULL OR start_at >= ?) ORDER BY start_at LIMIT 12").bind(new Date(now.getTime() - 86_400_000).toISOString(), now.toISOString());
       const latestSync = env.DB.prepare("SELECT finished_at FROM sync_runs WHERE status = 'success' ORDER BY id DESC LIMIT 1");
       const [eventResults, discoveryResults, syncResult] = await env.DB.batch([upcoming, discoveries, latestSync]);
       const syncedAt = (syncResult.results[0] as { finished_at?: string } | undefined)?.finished_at ?? null;
