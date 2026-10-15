@@ -33,6 +33,15 @@ curl -H "Authorization: Bearer $SYNC_TOKEN" -X POST https://sfevents.<your-subdo
 
 The scheduled cron sync runs daily at 16:00 UTC.
 
+## Agent CLI and skill
+
+Give another agent <code>skills/sfevents/SKILL.md</code>. It uses the deployed event feed instead of creating a second scraper.
+
+```bash
+npm run events -- list --limit=20
+SFEVENTS_SYNC_TOKEN=... npm run events -- refresh
+```
+
 ## Check
 
 ```bash

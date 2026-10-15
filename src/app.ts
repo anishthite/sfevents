@@ -84,7 +84,7 @@ export default {
       try { return Response.json({ synced: await sync(env) }); } catch (error) { await recordFailure(env, error); return Response.json({ error: error instanceof Error ? error.message : "Sync failed" }, { status: 502 }); }
     }
     if (url.pathname === "/api/events") {
-      const { results } = await env.DB.prepare("SELECT source_id, title, start_at, location, image_url, rsvp_status, sources, first_seen_at FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 100").bind(new Date().toISOString()).all();
+      const { results } = await env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, first_seen_at FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 100").bind(new Date().toISOString()).all();
       return Response.json({ events: results });
     }
     if (url.pathname === "/") {
