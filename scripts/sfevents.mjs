@@ -14,7 +14,8 @@ if (command === "refresh") {
   if (!response.ok) throw new Error(`Event API failed: ${response.status}`);
   const { events } = await response.json();
   for (const event of events.slice(0, limit)) {
-    console.log(`${event.start_at ?? "TBD"}\t${event.title}\t${event.location ?? ""}\t${event.source}\t${event.sources}\t${event.source_id}`);
+    const source = event.source ?? JSON.parse(event.sources)[0];
+    console.log(`${event.start_at ?? "TBD"}\t${event.title}\t${event.location ?? ""}\t${source}\t${event.sources}\t${event.source_id}`);
   }
 } else {
   throw new Error("Usage: node scripts/sfevents.mjs [list|refresh] [--limit=N]");
