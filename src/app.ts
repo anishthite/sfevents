@@ -54,11 +54,15 @@ function rankForDating(event: EventCard): RankedEvent {
   return { ...event, score, reasons: reasons.slice(0, 3) };
 }
 
+function eventUrl(event: EventCard) {
+  const raw = JSON.parse(event.raw ?? "{}") as { url?: string };
+  return event.source === "luma" ? `https://luma.com/${encodeURIComponent(event.source_id)}` : event.source === "19hz" ? raw.url ?? "https://19hz.info/eventlisting_BayArea.php" : `https://partiful.com/e/${encodeURIComponent(event.source_id)}`;
+}
+
 function eventCard(event: EventCard | RankedEvent, featured = false, rank?: number) {
   const date = event.start_at && event.start_at !== "TBD" ? new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(event.start_at)) : "Time TBD";
   const sources = JSON.parse(event.sources) as string[];
-  const raw = JSON.parse(event.raw ?? "{}") as { url?: string };
-  const href = event.source === "luma" ? `https://luma.com/${encodeURIComponent(event.source_id)}` : event.source === "19hz" ? raw.url ?? "https://19hz.info/eventlisting_BayArea.php" : `https://partiful.com/e/${encodeURIComponent(event.source_id)}`;
+  const href = eventUrl(event);
   return `<a class="event${featured ? " featured" : ""}" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${rank ? `<span class="rank">#${rank}<small>date pick</small></span>` : ""}<span class="date-mark">${escapeHtml(date.split(",")[0] ?? "TBD")}</span><span class="event-body"><span class="event-title">${escapeHtml(event.title)}</span>${"score" in event ? `<span class="score">Dating fit · ${event.score} points</span>` : ""}<span class="event-meta">${escapeHtml(date)}${event.location ? ` · ${escapeHtml(event.location)}` : ""}</span><span class="badges">${"reasons" in event ? event.reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join("") : `<span>${sources.includes("discoverable") ? "Discovered" : escapeHtml(sources.join(" · "))}</span>`}${event.rsvp_status ? `<span>${escapeHtml(event.rsvp_status.toLowerCase())}</span>` : ""}</span></span></a>`;
 }
 
@@ -84,8 +88,15 @@ export default {
       try { return Response.json({ synced: await sync(env) }); } catch (error) { await recordFailure(env, error); return Response.json({ error: error instanceof Error ? error.message : "Sync failed" }, { status: 502 }); }
     }
     if (url.pathname === "/api/events") {
-      const { results } = await env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, first_seen_at FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 100").bind(new Date().toISOString()).all();
-      return Response.json({ events: results });
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 100), 1), 100);
+      const { results } = await env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, raw, first_seen_at FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT ?").bind(new Date().toISOString(), limit).all<EventCard>();
+      return Response.json({ events: results.map((event) => ({ ...event, url: eventUrl(event) })) });
+    }
+    if (url.pathname === "/api/recommendations") {
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 10), 1), 50);
+      const { results } = await env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, raw FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT 250").bind(new Date().toISOString()).all<EventCard>();
+      const recommendations = results.map(rankForDating).sort((a, b) => b.score - a.score).slice(0, limit).map((event) => ({ ...event, url: eventUrl(event) }));
+      return Response.json({ goal: "dating", recommendations });
     }
     if (url.pathname === "/") {
       const now = new Date();

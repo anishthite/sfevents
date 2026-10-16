@@ -5,9 +5,10 @@ description: Find and recommend upcoming San Francisco Bay Area events from the 
 
 # SF Events
 
-Use the deployed source of truth; do not scrape Partiful, Luma, or 19hz independently.
+Use the deployed REST API as the source of truth; do not scrape Partiful, Luma, or 19hz independently.
 
 ```bash
+curl 'https://sfevents.anishthite.workers.dev/api/recommendations?limit=10'
 node scripts/sfevents.mjs list --limit=50
 ```
 

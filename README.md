@@ -33,6 +33,16 @@ curl -H "Authorization: Bearer $SYNC_TOKEN" -X POST https://sfevents.<your-subdo
 
 The scheduled cron sync runs daily at 16:00 UTC.
 
+## REST API
+
+```text
+GET  /api/events?limit=100
+GET  /api/recommendations?limit=10
+POST /api/sync                 # Authorization: Bearer $SFEVENTS_SYNC_TOKEN
+```
+
+`/api/recommendations` returns dating-ranked events with transparent scores, reasons, and outbound URLs.
+
 ## Agent CLI and skill
 
 Give another agent <code>skills/sfevents/SKILL.md</code>. It uses the deployed event feed instead of creating a second scraper.
