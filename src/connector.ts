@@ -95,30 +95,11 @@ async function getCandidates(env: Env) {
       return results.filter((event): event is NonNullable<typeof event> => event !== null);
     })
     .catch(() => []);
-  const lumaHeaders = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36", Accept: "text/html,application/xhtml+xml" };
-  const lumaDiscoverable = Promise.all([
-    "https://luma.com/sf",
-    "https://luma.com/thefoldsf",
-    "https://luma.com/SFSocialClubHouse",
-    "https://luma.com/startupsocial",
-  ].map(async (url) => {
-    const response = await fetch(url, { headers: lumaHeaders });
-    if (!response.ok) throw new Error(`Luma returned ${response.status}`);
-    return response.text();
-  }))
-    .then(async (pages) => {
-      const slugs = [...new Set(pages.flatMap((page) => [...page.matchAll(/<a[^>]*class="event-link[^>]*href="\/([^"?#]+)/g)].map((match) => match[1])))].slice(0, 60);
-      const events = await Promise.all(slugs.map(async (slug) => {
-        try {
-          const response = await fetch(`https://luma.com/${slug}`, { headers: lumaHeaders });
-          const html = await response.text();
-          const match = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
-          if (!match) return null;
-          const data = JSON.parse(match[1]) as { name?: string; description?: string; startDate?: string; endDate?: string; image?: string; location?: { name?: string } };
-          return data.name ? { id: slug, title: data.name, description: data.description, startDate: data.startDate, endDate: data.endDate, locationDisplayText: data.location?.name, image: data.image ? { url: data.image } : undefined } : null;
-        } catch { return null; }
-      }));
-      return events.filter((event): event is NonNullable<typeof event> => event !== null);
+  const lumaDiscoverable = fetch("https://api.lu.ma/discover/get-paginated-events?pagination_limit=100&discover_place_api_id=discplace-BDj7GNbGlsF7Cka", { headers: { Accept: "application/json" } })
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`Luma Discover returned ${response.status}`);
+      const data = await response.json() as { entries?: Array<{ event?: { url?: string; name?: string; start_at?: string; end_at?: string; timezone?: string; cover_url?: string; geo_address_info?: { city_state?: string; city?: string } } }> };
+      return (data.entries ?? []).flatMap(({ event }) => event?.url && event.name ? [{ id: event.url, title: event.name, startDate: event.start_at, endDate: event.end_at, timezone: event.timezone, locationDisplayText: event.geo_address_info?.city_state ?? event.geo_address_info?.city, image: event.cover_url ? { url: event.cover_url } : undefined }] : []);
     })
     .catch(() => []);
   const nineteenHz = fetch("https://19hz.info/eventlisting_BayArea.php").then((response) => response.ok ? response.text() : "").then(parse19hz).catch(() => []);
