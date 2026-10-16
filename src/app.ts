@@ -89,6 +89,19 @@ export default {
       if (request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) return new Response("Unauthorized", { status: 401 });
       try { return Response.json({ synced: await sync(env) }); } catch (error) { await recordFailure(env, error); return Response.json({ error: error instanceof Error ? error.message : "Sync failed" }, { status: 502 }); }
     }
+    if (url.pathname === "/api/luma/ingest" && request.method === "POST") {
+      if (!env.SYNC_TOKEN || request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) return new Response("Unauthorized", { status: 401 });
+      let payload: unknown;
+      try { payload = await request.json(); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
+      if (!Array.isArray(payload) || payload.length > 100 || !payload.every((event) => event && typeof event === "object" && typeof event.id === "string" && /^[\w-]{1,100}$/.test(event.id) && typeof event.title === "string" && event.title.length > 0 && event.title.length <= 500 && typeof event.startDate === "string" && Number.isFinite(Date.parse(event.startDate)))) return Response.json({ error: "Expected up to 100 valid Luma events" }, { status: 400 });
+      const now = new Date().toISOString();
+      const events = payload as Array<{ id: string; title: string; startDate: string; endDate?: string; timezone?: string; locationDisplayText?: string; description?: string }>;
+      const statements = events.map((event) => env.DB.prepare(`INSERT INTO events (source, source_id, title, start_at, end_at, timezone, location, image_url, rsvp_status, sources, raw, first_seen_at, updated_at)
+        VALUES ('luma', ?, ?, ?, ?, ?, ?, NULL, NULL, '["luma"]', ?, ?, ?)
+        ON CONFLICT(source, source_id) DO UPDATE SET title=excluded.title, start_at=excluded.start_at, end_at=excluded.end_at, timezone=excluded.timezone, location=excluded.location, raw=excluded.raw, updated_at=excluded.updated_at`).bind(event.id, event.title, event.startDate, event.endDate ?? null, event.timezone ?? null, event.locationDisplayText ?? null, JSON.stringify(event), now, now));
+      if (statements.length) await env.DB.batch(statements);
+      return Response.json({ ingested: events.length });
+    }
     if (url.pathname === "/api/events") {
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 100), 1), 100);
       const { results } = await env.DB.prepare("SELECT source, source_id, title, start_at, location, image_url, rsvp_status, sources, raw, first_seen_at FROM events WHERE start_at IS NULL OR start_at >= ? ORDER BY start_at LIMIT ?").bind(new Date().toISOString(), limit).all<EventCard>();

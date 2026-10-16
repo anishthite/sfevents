@@ -95,20 +95,13 @@ async function getCandidates(env: Env) {
       return results.filter((event): event is NonNullable<typeof event> => event !== null);
     })
     .catch(() => []);
-  const lumaDiscoverable = fetch("https://api.lu.ma/discover/get-paginated-events?pagination_limit=100&discover_place_api_id=discplace-BDj7GNbGlsF7Cka", { headers: { Accept: "application/json" } })
-    .then(async (response) => {
-      if (!response.ok) throw new Error(`Luma Discover returned ${response.status}`);
-      const data = await response.json() as { entries?: Array<{ event?: { url?: string; name?: string; start_at?: string; end_at?: string; timezone?: string; cover_url?: string; geo_address_info?: { city_state?: string; city?: string } } }> };
-      return (data.entries ?? []).flatMap(({ event }) => event?.url && event.name ? [{ id: event.url, title: event.name, startDate: event.start_at, endDate: event.end_at, timezone: event.timezone, locationDisplayText: event.geo_address_info?.city_state ?? event.geo_address_info?.city, image: event.cover_url ? { url: event.cover_url } : undefined }] : []);
-    })
-    .catch(() => []);
   const nineteenHz = fetch("https://19hz.info/eventlisting_BayArea.php").then((response) => response.ok ? response.text() : "").then(parse19hz).catch(() => []);
-  const [discoverable, publicEvents, lumaEvents, nineteenHzEvents, rsvps, saved, followed] = await Promise.all([
-    post("getDiscoverableEvents"), publicDiscoverable, lumaDiscoverable, nineteenHz, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
+  const [discoverable, publicEvents, nineteenHzEvents, rsvps, saved, followed] = await Promise.all([
+    post("getDiscoverableEvents"), publicDiscoverable, nineteenHz, post("getMyRsvps"), post("getMySavedEvents"), post("getMyFollowedEvents"),
   ]);
   const events = (value: unknown) => Array.isArray(value) ? value : (value as { events?: unknown[] } | null)?.events ?? [];
   const byId = new Map([...events(discoverable), ...publicEvents].filter((event) => event && typeof event === "object" && "id" in event).map((event) => [(event as { id: string }).id, event]));
-  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed), luma: lumaEvents, "19hz": nineteenHzEvents }; 
+  return { discoverable: [...byId.values()], rsvps: events(rsvps), saved: events(saved), followed: events(followed), "19hz": nineteenHzEvents };
 }
 
 export default {

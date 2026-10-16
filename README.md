@@ -33,6 +33,17 @@ curl -H "Authorization: Bearer $SYNC_TOKEN" -X POST https://sfevents.<your-subdo
 
 The scheduled cron sync runs daily at 16:00 UTC.
 
+## Local SF Luma collector
+
+Luma's Discover feed is IP-geolocated and returned empty from the Worker. The Mac collector uses the hardcoded San Francisco place ID, paginates the public API, and uploads events through `POST /api/luma/ingest` using the existing `SYNC_TOKEN`. It needs no Luma API key or browser session.
+
+```bash
+node scripts/collect-luma.mjs     # one-off run; reads ignored .sync-token (or SFEVENTS_SYNC_TOKEN)
+zsh scripts/install-luma-launchd.sh # daily at 10:00 local, plus one run now
+```
+
+The Mac must be awake at the scheduled time. Check `~/Library/Logs/sfevents-luma.{log,err.log}` for failures. Never commit `.sync-token`.
+
 ## REST API
 
 ```text
