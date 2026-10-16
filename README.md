@@ -41,7 +41,7 @@ GET  /api/recommendations?limit=10
 POST /api/sync                 # Authorization: Bearer $SFEVENTS_SYNC_TOKEN
 ```
 
-`/api/recommendations` returns dating-ranked events with transparent scores, reasons, and outbound URLs.
+`/api/recommendations` returns events ranked for meeting people, with transparent scores, reasons, and outbound URLs.
 
 ## Agent CLI and skill
 

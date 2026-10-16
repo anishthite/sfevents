@@ -28,4 +28,4 @@ SFEVENTS_SYNC_TOKEN=... node scripts/sfevents.mjs refresh
 
 ## Default recommendation lens
 
-For dating, prefer explicit singles/dating/mixer signals, then solo-friendly social activities, classes, walks, games, and dance events. Do not claim an event will have a particular gender balance or infer people’s identities from names or photos.
+For meeting potential dates, prefer explicit singles/mixer signals, solo-friendly recurring communities, and shared social activities such as classes, walks, games, crafts, and dance. Do not claim an event will have a particular gender balance or infer people’s identities from names or photos.
