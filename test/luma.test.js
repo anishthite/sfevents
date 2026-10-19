@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { collect } from "../scripts/collect-luma.mjs";
+import { collect, nextRun, retryDelay } from "../scripts/collect-luma.mjs";
+
+test("daily catch-up and bounded retry backoff", () => {
+  const now = 1_000_000_000;
+  assert.equal(nextRun({ lastSuccess: now - 60_000 }, now), now - 60_000 + 86_400_000);
+  assert.equal(nextRun({ lastSuccess: now - 90_000_000 }, now), null);
+  assert.equal(retryDelay(1), 900_000);
+  assert.equal(retryDelay(20), 21_600_000);
+  assert.equal(nextRun({ failures: 1, nextRetry: now + 900_000 }, now), now + 900_000);
+  assert.equal(nextRun({ failures: 1, nextRetry: now - 1 }, now), null);
+});
 
 test("SF feed pagination keeps unique Luma slugs", async () => {
   const urls = [];

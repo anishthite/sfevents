@@ -10,7 +10,7 @@ cat > "$plist" <<EOF
 <plist version="1.0"><dict>
 <key>Label</key><string>com.anishthite.sfevents-luma</string>
 <key>ProgramArguments</key><array><string>$node</string><string>$root/scripts/collect-luma.mjs</string></array>
-<key>StartCalendarInterval</key><dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+<key>StartInterval</key><integer>900</integer>
 <key>RunAtLoad</key><true/>
 <key>StandardOutPath</key><string>$HOME/Library/Logs/sfevents-luma.log</string>
 <key>StandardErrorPath</key><string>$HOME/Library/Logs/sfevents-luma.err.log</string>
@@ -18,4 +18,4 @@ cat > "$plist" <<EOF
 EOF
 launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist"
-echo "Installed $plist (daily at 10:00 local time, while Mac is awake)"
+echo "Installed $plist (checks every 15 minutes while awake; catches up after login/wake)"

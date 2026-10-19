@@ -39,10 +39,10 @@ Luma's Discover feed is IP-geolocated and returned empty from the Worker. The Ma
 
 ```bash
 node scripts/collect-luma.mjs     # one-off run; reads ignored .sync-token (or SFEVENTS_SYNC_TOKEN)
-zsh scripts/install-luma-launchd.sh # daily at 10:00 local, plus one run now
+zsh scripts/install-luma-launchd.sh # check every 15 minutes; run on login
 ```
 
-The Mac must be awake at the scheduled time. Check `~/Library/Logs/sfevents-luma.{log,err.log}` for failures. Never commit `.sync-token`.
+The job checks every 15 minutes while awake and on login. A missed run catches up after wake/login; successful runs are at least 24 hours apart. Failures retry with exponential backoff from 15 minutes up to 6 hours. State lives in `~/Library/Application Support/sfevents/luma-sync.json`; logs live in `~/Library/Logs/sfevents-luma.{log,err.log}`. Never commit `.sync-token`.
 
 ## REST API
 
